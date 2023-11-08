@@ -88,7 +88,7 @@ public class NetworkingRequest: NSObject {
         }
         let urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         return urlSession.dataTaskPublisher(for: urlRequest)
-            .tryMap { [weak self] (data: Data, response: URLResponse) -> Data in
+            .tryMap { [weak self, weak urlSession] (data: Data, response: URLResponse) -> Data in
                 self?.logger.log(response: response, data: data)
                 if let httpURLResponse = response as? HTTPURLResponse {
                     if !(200...299 ~= httpURLResponse.statusCode) {
@@ -99,6 +99,7 @@ public class NetworkingRequest: NSObject {
                         throw error
                     }
                 }
+                urlSession?.invalidateAndCancel()
                 return data
             }.tryCatch({ [weak self, urlRequest, weak urlSession] error -> AnyPublisher<Data, Error> in
                 guard
