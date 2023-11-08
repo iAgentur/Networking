@@ -100,12 +100,13 @@ public class NetworkingRequest: NSObject {
                     }
                 }
                 return data
-            }.tryCatch({ [weak self, urlRequest] error -> AnyPublisher<Data, Error> in
+            }.tryCatch({ [weak self, urlRequest, weak urlSession] error -> AnyPublisher<Data, Error> in
                 guard
                     let self = self,
                     retryCount > 1,
                     let retryPublisher = self.requestRetrier?(urlRequest, error)
                 else {
+                    urlSession?.invalidateAndCancel()
                     throw error
                 }
                 return retryPublisher

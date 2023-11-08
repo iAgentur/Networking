@@ -37,10 +37,12 @@ public extension NetworkingClient {
         req.params               = params
 
         updateRequest(req)
-        req.requestRetrier = { [weak self] in
+        req.requestRetrier = { [weak self, weak req] in
             self?.requestRetrier?($0, $1)?
-                .handleEvents(receiveOutput: { [weak self] _ in
-                    self?.updateRequest(req)
+                .handleEvents(receiveOutput: { [weak self, weak req] _ in
+                    if let req {
+                        self?.updateRequest(req)
+                    }
                 })
                 .eraseToAnyPublisher()
         }
