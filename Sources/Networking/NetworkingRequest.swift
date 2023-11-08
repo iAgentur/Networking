@@ -41,8 +41,8 @@ public class NetworkingRequest: NSObject {
         let config = sessionConfiguration ?? URLSessionConfiguration.default
         let urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         let callPublisher: AnyPublisher<(Data?, Progress), Error> = urlSession.dataTaskPublisher(for: urlRequest)
-            .tryMap { (data: Data, response: URLResponse) -> Data in
-                self.logger.log(response: response, data: data)
+            .tryMap { [weak self] (data: Data, response: URLResponse) -> Data in
+                self?.logger.log(response: response, data: data)
                 if let httpURLResponse = response as? HTTPURLResponse {
                     if !(200...299 ~= httpURLResponse.statusCode) {
                         var error = NetworkingError(errorCode: httpURLResponse.statusCode)
@@ -82,8 +82,8 @@ public class NetworkingRequest: NSObject {
         let config = sessionConfiguration ?? URLSessionConfiguration.default
         let urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         return urlSession.dataTaskPublisher(for: urlRequest)
-            .tryMap { (data: Data, response: URLResponse) -> Data in
-                self.logger.log(response: response, data: data)
+            .tryMap { [weak self] (data: Data, response: URLResponse) -> Data in
+                self?.logger.log(response: response, data: data)
                 if let httpURLResponse = response as? HTTPURLResponse {
                     if !(200...299 ~= httpURLResponse.statusCode) {
                         var error = NetworkingError(errorCode: httpURLResponse.statusCode)
@@ -103,8 +103,12 @@ public class NetworkingRequest: NSObject {
                     throw error
                 }
                 return retryPublisher
-                    .flatMap { _ -> AnyPublisher<Data, Error> in
-                        self.publisher(retryCount: retryCount - 1)
+                    .flatMap { [weak self] _ -> AnyPublisher<Data, Error> in
+                        if let self {
+                            return self.publisher(retryCount: retryCount - 1)
+                        } else {
+                            return Fail(error: error).eraseToAnyPublisher()
+                        }
                     }
                     .eraseToAnyPublisher()
             }).mapError { error -> NetworkingError in
@@ -120,14 +124,14 @@ public class NetworkingRequest: NSObject {
         let config = sessionConfiguration ?? URLSessionConfiguration.default
         let urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
         return try await withCheckedThrowingContinuation { continuation in
-            urlSession.dataTask(with: urlRequest) { data, response, error in
+            urlSession.dataTask(with: urlRequest) { [weak self] data, response, error in
                 guard let data = data, let response = response else {
                     if let error = error {
                         continuation.resume(throwing: error)
                     }
                     return
                 }
-                self.logger.log(response: response, data: data)
+                self?.logger.log(response: response, data: data)
                 if let httpURLResponse = response as? HTTPURLResponse {
                     if !(200...299 ~= httpURLResponse.statusCode) {
                         var error = NetworkingError(errorCode: httpURLResponse.statusCode)
