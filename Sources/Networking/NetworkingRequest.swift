@@ -39,7 +39,10 @@ public class NetworkingRequest: NSObject {
         logger.log(request: urlRequest)
 
         let config = sessionConfiguration ?? URLSessionConfiguration.default
-        let urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        let delegate = NetworkingRequestSessionDelegate { [weak self] in
+            self?.progressPublisher.send($0)
+        }
+        let urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         let callPublisher: AnyPublisher<(Data?, Progress), Error> = urlSession.dataTaskPublisher(for: urlRequest)
             .tryMap { [weak self] (data: Data, response: URLResponse) -> Data in
                 self?.logger.log(response: response, data: data)
@@ -80,7 +83,10 @@ public class NetworkingRequest: NSObject {
         logger.log(request: urlRequest)
 
         let config = sessionConfiguration ?? URLSessionConfiguration.default
-        let urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        let delegate = NetworkingRequestSessionDelegate { [weak self] in
+            self?.progressPublisher.send($0)
+        }
+        let urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         return urlSession.dataTaskPublisher(for: urlRequest)
             .tryMap { [weak self] (data: Data, response: URLResponse) -> Data in
                 self?.logger.log(response: response, data: data)
@@ -122,7 +128,10 @@ public class NetworkingRequest: NSObject {
         }
         logger.log(request: urlRequest)
         let config = sessionConfiguration ?? URLSessionConfiguration.default
-        let urlSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        let delegate = NetworkingRequestSessionDelegate { [weak self] in
+            self?.progressPublisher.send($0)
+        }
+        let urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         return try await withCheckedThrowingContinuation { continuation in
             urlSession.dataTask(with: urlRequest) { [weak self] data, response, error in
                 guard let data = data, let response = response else {
@@ -245,16 +254,25 @@ extension CharacterSet {
     }()
 }
 
-extension NetworkingRequest: URLSessionTaskDelegate {
-    public func urlSession(_ session: URLSession,
+private class NetworkingRequestSessionDelegate: NSObject, URLSessionTaskDelegate {
+    
+    private let onProgress: (Progress) -> Void
+    
+    init(onProgress: @escaping (Progress) -> Void) {
+        self.onProgress = onProgress
+        super.init()
+    }
+    
+    func urlSession(_ session: URLSession,
                            task: URLSessionTask,
                            didSendBodyData bytesSent: Int64,
                            totalBytesSent: Int64,
                            totalBytesExpectedToSend: Int64) {
         let progress = Progress(totalUnitCount: totalBytesExpectedToSend)
         progress.completedUnitCount = totalBytesSent
-        progressPublisher.send(progress)
+        onProgress(progress)
     }
+    
 }
 
 public enum ParameterEncoding {

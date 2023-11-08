@@ -36,23 +36,24 @@ public extension NetworkingClient {
         req.route                = route
         req.params               = params
 
-        let updateRequest = { [weak req, weak self] in
-            guard let self = self else { return }
-            req?.baseURL              = self.baseURL
-            req?.logLevel             = self.logLevel
-            req?.headers              = self.headers
-            req?.parameterEncoding    = self.parameterEncoding
-            req?.sessionConfiguration = self.sessionConfiguration
-            req?.timeout              = self.timeout
-        }
-        updateRequest()
+        updateRequest(req)
         req.requestRetrier = { [weak self] in
             self?.requestRetrier?($0, $1)?
-                .handleEvents(receiveOutput: { _ in
-                    updateRequest()
+                .handleEvents(receiveOutput: { [weak self] _ in
+                    self?.updateRequest(req)
                 })
                 .eraseToAnyPublisher()
         }
         return req
     }
+    
+    private func updateRequest(_ req: NetworkingRequest) {
+        req.baseURL              = baseURL
+        req.logLevel             = logLevel
+        req.headers              = headers
+        req.parameterEncoding    = parameterEncoding
+        req.sessionConfiguration = sessionConfiguration
+        req.timeout              = timeout
+    }
+    
 }
