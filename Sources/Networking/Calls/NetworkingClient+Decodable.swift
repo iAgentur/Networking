@@ -44,7 +44,7 @@ public extension NetworkingClient {
                                           keypath: String? = nil
     ) -> AnyPublisher<T, Error> {
         return post(route, body: body)
-            .tryMap { json -> T in try self.toModel(json, keypath: keypath) }
+            .tryMap { json -> T in try NetworkingClient.toModel(json, keypath: keypath) }
             .receive(on: DispatchQueue.main)
             .eraseToAnyPublisher()
     }
@@ -95,7 +95,7 @@ public extension NetworkingClient {
                                           keypath: String? = nil
     ) -> AnyPublisher<T, Error> {
         return patch(route, body: body)
-            .tryMap { json -> T in try self.toModel(json, keypath: keypath) }
+            .tryMap { json -> T in try NetworkingClient.toModel(json, keypath: keypath) }
             .receive(on: DispatchQueue.main)
             .eraseToAnyPublisher()
     }
@@ -163,7 +163,7 @@ public extension NetworkingClient {
                                           keypath: String? = nil
     ) async throws -> T {
         let json: Any = try await post(route, body: body)
-        return try self.toModel(json, keypath: keypath)
+        return try NetworkingClient.toModel(json, keypath: keypath)
     }
     
     func post<T: Decodable>(_ route: String,
@@ -209,7 +209,7 @@ public extension NetworkingClient {
                                           keypath: String? = nil
     ) async throws -> T {
         let json: Any = try await patch(route, body: body)
-        return try self.toModel(json, keypath: keypath)
+        return try NetworkingClient.toModel(json, keypath: keypath)
     }
     
     func delete<T: Decodable>(_ route: String,
