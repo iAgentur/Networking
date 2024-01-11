@@ -39,6 +39,16 @@ public extension NetworkingClient {
             .eraseToAnyPublisher()
     }
     
+    func post<T: Decodable>(_ route: String,
+                                          body: Encodable,
+                                          keypath: String? = nil
+    ) -> AnyPublisher<T, Error> {
+        return post(route, body: body)
+            .tryMap { json -> T in try self.toModel(json, keypath: keypath) }
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
+    }
+    
     // Array version
     func post<T: Decodable>(_ route: String,
                            params: Params = Params(),
@@ -75,6 +85,17 @@ public extension NetworkingClient {
                                            keypath: String? = nil) -> AnyPublisher<T, Error> {
         return patch(route, params: params)
             .tryMap { [weak self] json -> T in try NetworkingClient.toModel(json, jsonDecoderFactory: self?.jsonDecoderFactory, keypath: keypath) }
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
+    }
+    
+
+    func patch<T: Decodable>(_ route: String,
+                                          body: Encodable,
+                                          keypath: String? = nil
+    ) -> AnyPublisher<T, Error> {
+        return patch(route, body: body)
+            .tryMap { json -> T in try self.toModel(json, keypath: keypath) }
             .receive(on: DispatchQueue.main)
             .eraseToAnyPublisher()
     }
@@ -138,6 +159,14 @@ public extension NetworkingClient {
     }
     
     func post<T: Decodable>(_ route: String,
+                                          body: Encodable,
+                                          keypath: String? = nil
+    ) async throws -> T {
+        let json: Any = try await post(route, body: body)
+        return try self.toModel(json, keypath: keypath)
+    }
+    
+    func post<T: Decodable>(_ route: String,
                            params: Params = Params(),
                            keypath: String? = nil) async throws -> T where T: Collection {
         let keypath = keypath ?? defaultCollectionParsingKeyPath
@@ -173,6 +202,14 @@ public extension NetworkingClient {
         let keypath = keypath ?? defaultCollectionParsingKeyPath
         let json: Any = try await patch(route, params: params)
         return try NetworkingClient.toModel(json, jsonDecoderFactory: jsonDecoderFactory, keypath: keypath)
+    }
+    
+    func patch<T: Decodable>(_ route: String,
+                                          body: Encodable,
+                                          keypath: String? = nil
+    ) async throws -> T {
+        let json: Any = try await patch(route, body: body)
+        return try self.toModel(json, keypath: keypath)
     }
     
     func delete<T: Decodable>(_ route: String,

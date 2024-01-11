@@ -29,13 +29,17 @@ public extension NetworkingClient {
     func deleteRequest(_ route: String, params: Params = Params()) -> NetworkingRequest {
         request(.delete, route, params: params)
     }
-
-    internal func request(_ httpMethod: HTTPMethod, _ route: String, params: Params = Params()) -> NetworkingRequest {
+    
+    internal func request(_ httpMethod: HTTPMethod,
+                          _ route: String,
+                          params: Params = Params(),
+                          encodableBody: Encodable? = nil) -> NetworkingRequest {
         let req = NetworkingRequest()
-        req.httpMethod             = httpMethod
+        req.httpMethod           = httpMethod
         req.route                = route
         req.params               = params
-
+        req.encodableBody        = encodableBody
+        
         updateRequest(req)
         req.requestRetrier = { [weak self, weak req] in
             self?.requestRetrier?($0, $1)?

@@ -17,6 +17,7 @@ public class NetworkingRequest: NSObject {
     var route = ""
     var httpMethod = HTTPMethod.get
     public var params = Params()
+    public var encodableBody: Encodable?
     var headers = [String: String]()
     var multipartData: [MultipartData]?
     var logLevel: NetworkingLogLevel {
@@ -132,28 +133,17 @@ public class NetworkingRequest: NSObject {
             self?.progressPublisher.send($0)
         }
         let urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-        return try await withCheckedThrowingContinuation { continuation in
-            urlSession.dataTask(with: urlRequest) { [weak self] data, response, error in
-                guard let data = data, let response = response else {
-                    if let error = error {
-                        continuation.resume(throwing: error)
-                    }
-                    return
-                }
-                self?.logger.log(response: response, data: data)
-                if let httpURLResponse = response as? HTTPURLResponse {
-                    if !(200...299 ~= httpURLResponse.statusCode) {
-                        var error = NetworkingError(errorCode: httpURLResponse.statusCode)
-                        if let json = try? JSONSerialization.jsonObject(with: data, options: []) {
-                            error.jsonPayload = json
-                        }
-                        continuation.resume(throwing: error)
-                        return
-                    }
-                }
-                continuation.resume(returning: data)
-            }.resume()
+        let (data, response) = try await urlSession.data(for: urlRequest)
+        logger.log(response: response, data: data)
+        if let httpURLResponse = response as? HTTPURLResponse, !(200...299 ~= httpURLResponse.statusCode) {
+            var error = NetworkingError(errorCode: httpURLResponse.statusCode)
+            if let json = try? JSONSerialization.jsonObject(with: data, options: []) {
+                error.jsonPayload = json
+            }
+            throw error
         }
+        return data
+        
     }
     
     private func getURLWithParams() -> String {
@@ -209,12 +199,22 @@ public class NetworkingRequest: NSObject {
         }
         
         if httpMethod != .get && multipartData == nil {
-            switch parameterEncoding {
-            case .urlEncoded:
-                request.httpBody = params.asPercentEncodedString().data(using: .utf8)
-            case .json:
-                let jsonData = try? JSONSerialization.data(withJSONObject: params)
-                request.httpBody = jsonData
+            if let encodableBody {
+                let jsonEncoder = JSONEncoder()
+                do {
+                    let data = try jsonEncoder.encode(encodableBody)
+                    request.httpBody = data
+                } catch {
+                    print(error)
+                }
+            } else {
+                switch parameterEncoding {
+                case .urlEncoded:
+                    request.httpBody = params.asPercentEncodedString().data(using: .utf8)
+                case .json:
+                    let jsonData = try? JSONSerialization.data(withJSONObject: params)
+                    request.httpBody = jsonData
+                }
             }
         }
         
